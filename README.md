@@ -33,7 +33,8 @@ aws-serverless-web-application/
 ├── lambda_function_code_explanation.md
 ├── contactus.html
 ├── success.html
-└── iam-policy.json
+└── IAM_POLICIES.md
+
 ```
 
 ---
