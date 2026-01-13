@@ -1,43 +1,79 @@
 import json
+import os
 import boto3
-import urllib.parse
-
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('leetable')
 
 def lambda_handler(event, context):
     try:
-        method = event.get('httpMethod')
-        if not method:
-            method = event['requestContext']['http']['method']
+        httpmethod = event.get('httpMethod')
 
-        if method == 'GET':
-            return load_page('contactus.html')
+        # For HTTP API (v2)
+        if not httpmethod:
+            httpmethod = event['requestContext']['http']['method']
 
-        if method == 'POST':
-            data = urllib.parse.parse_qs(event['body'])
-            save_data(data)
-            return load_page('success.html')
+        mypage = page_router(
+            httpmethod,
+            event.get('queryStringParameters'),
+            event.get('body')
+        )
 
-        return {'statusCode': 405, 'body': 'Method Not Allowed'}
+        return mypage
 
     except Exception as e:
-        return {'statusCode': 500, 'body': json.dumps(str(e))}
-
-def load_page(file):
-    with open(file) as f:
         return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'text/html'},
-            'body': f.read()
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
         }
 
-def save_data(data):
-    table.put_item(
-        Item={
-            'email': data['email'][0],
-            'first_name': data['fname'][0],
-            'last_name': data['lname'][0],
-            'message': data['message'][0]
-        }
+def page_router(httpmethod, querystring, formbody):
+    if httpmethod == 'GET':
+        try:
+            with open('contactus.html', 'r') as htmlFile:
+                htmlContent = htmlFile.read()
+            return {
+                'statusCode': 200,
+                'headers': {"Content-Type": "text/html"},
+                'body': htmlContent
+            }
+        except Exception as e:
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'error': str(e)})
+            }
+
+    elif httpmethod == 'POST':
+        try:
+            insert_record(formbody)
+            with open('success.html', 'r') as htmlFile:
+                htmlContent = htmlFile.read()
+            return {
+                'statusCode': 200,
+                'headers': {"Content-Type": "text/html"},
+                'body': htmlContent
+            }
+        except Exception as e:
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'error': str(e)})
+            }
+
+def insert_record(formbody):
+    import uuid
+
+    # Generate unique primary key
+    item_id = str(uuid.uuid4())
+
+    # Convert form data to PartiQL format
+    formbody = formbody.replace("=", "' : '")
+    formbody = formbody.replace("&", "', '")
+
+    # FINAL CORRECT PartiQL (single item only)
+    formbody = (
+        "INSERT INTO leemou VALUE {"
+        "'id' : '" + item_id + "', '"
+        + formbody +
+        "'}"
     )
+
+    client = boto3.client('dynamodb')
+    response = client.execute_statement(Statement=formbody)
+    return response
