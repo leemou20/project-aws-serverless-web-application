@@ -1,0 +1,4 @@
+LambdaBasicExecutionPolicy
+LambdaDynamoDBPutItemPolicy
+LambdaDynamoDBPartiQLPolicy
+
